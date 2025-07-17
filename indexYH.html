@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Young Haleny Explorer</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Světle modré pozadí */
+        }
+        .app-bg {
+            background-color: #005bbb; /* Hlavní modrá */
+        }
+        .accent-bg {
+            background-color: #ffd500; /* Hlavní žlutá */
+        }
+        .accent-text {
+            color: #ffd500;
+        }
+        .btn-primary {
+            background-color: #005bbb;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #004a9a;
+        }
+        .btn-accent {
+            background-color: #ffd500;
+            color: #005bbb;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .btn-accent:hover {
+            background-color: #e6c000;
+        }
+        /* Skryté defaultně */
+        #upload-view, #gallery-view, #loading-overlay, #message-modal, #photo-detail-modal {
+            display: none;
+        }
+        /* Styly pro náhled obrázku */
+        #image-preview-container {
+            display: none;
+            width: 150px;
+            height: 150px;
+            border: 2px dashed #ccc;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            margin: 1rem auto;
+        }
+        #image-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* Malý spinner pro generování komentáře */
+        .comment-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #005bbb;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+
+    <div id="app-container" class="max-w-lg mx-auto min-h-screen bg-white shadow-lg">
+
+        <!-- ===== HLAVIČKA ===== -->
+        <header class="app-bg text-white p-4 text-center shadow-md">
+            <h1 class="text-2xl font-bold">Young Haleny Explorer</h1>
+            <p class="text-sm accent-text">Objevuj Halenkovice v čase</p>
+        </header>
+
+        <main id="main-content" class="p-4 md:p-6">
+
+            <!-- ===== DOMÁCÍ OBRAZOVKA (VÝBĚR AKCE) ===== -->
+            <div id="home-view">
+                <div class="text-center py-12">
+                    <h2 class="text-3xl font-bold text-gray-700 mb-4">Vítejte!</h2>
+                    <p class="text-gray-600 mb-8">Co si přejete udělat?</p>
+                    <div class="space-y-4">
+                        <button id="go-to-upload-btn" class="w-full max-w-xs mx-auto btn-accent py-3 px-6 rounded-lg text-lg shadow-md">
+                            Nahrát novou fotku
+                        </button>
+                        <button id="go-to-gallery-btn" class="w-full max-w-xs mx-auto btn-primary py-3 px-6 rounded-lg text-lg shadow-md">
+                            Prohlížet galerii
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== OBRAZOVKA PRO NAHRÁNÍ FOTKY ===== -->
+            <div id="upload-view">
+                <div class="flex items-center mb-4">
+                    <button id="back-to-home-from-upload" class="text-blue-600 hover:underline">&larr; Zpět</button>
+                    <h2 class="text-2xl font-bold text-gray-700 mx-auto">Nahrát fotku</h2>
+                </div>
+                <form id="upload-form" class="space-y-6">
+                    <div>
+                        <label for="location" class="block text-sm font-medium text-gray-700 mb-1">Lokalita</label>
+                        <select id="location" name="location" required class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Vyberte lokalitu...</option>
+                            <option value="Krzle">Kržle</option>
+                            <option value="Sarka">Šárka</option>
+                            <option value="Hradska">Hradská</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="photo" class="block text-sm font-medium text-gray-700 mb-1">Fotografie</label>
+                        <input type="file" id="photo" name="photo" accept="image/*" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <div id="image-preview-container">
+                            <img id="image-preview" src="" alt="Náhled fotografie">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="comment" class="block text-sm font-medium text-gray-700 mb-1">Komentář</label>
+                        <textarea id="comment" name="comment" rows="4" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Přidejte popisek nebo si nechte vygenerovat..."></textarea>
+                        <div class="flex items-center justify-end mt-2">
+                             <div id="comment-spinner" class="comment-spinner mr-2"></div>
+                             <button type="button" id="generate-comment-btn" class="text-sm btn-primary py-1 px-3 rounded-md">
+                                ✨ Vygenerovat komentář
+                             </button>
+                        </div>
+                    </div>
+                    <div>
+                        <button type="submit" class="w-full btn-accent py-3 px-6 rounded-lg text-lg shadow-md">
+                            Nahrát do systému
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ===== GALERIE FOTEK ===== -->
+            <div id="gallery-view">
+                 <div class="flex items-center mb-4">
+                    <button id="back-to-home-from-gallery" class="text-blue-600 hover:underline">&larr; Zpět</button>
+                    <h2 class="text-2xl font-bold text-gray-700 mx-auto">Galerie</h2>
+                </div>
+                <div id="gallery-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <!-- Fotky budou vloženy sem pomocí JS -->
+                </div>
+                <p id="no-photos-message" class="text-center text-gray-500 mt-8 hidden">Zatím zde nejsou žádné fotografie. Nahrajte první!</p>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ===== LOADING OVERLAY ===== -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="text-center text-white">
+            <div class="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-yellow-400 mx-auto"></div>
+            <p class="mt-4 text-lg">Nahrávám...</p>
+        </div>
+    </div>
+
+    <!-- ===== MESSAGE MODAL ===== -->
+    <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl text-center max-w-sm mx-4">
+            <h3 id="message-title" class="text-xl font-bold mb-2"></h3>
+            <p id="message-text" class="text-gray-600 mb-4"></p>
+            <button id="message-close-btn" class="btn-primary py-2 px-6 rounded-lg">Zavřít</button>
+        </div>
+    </div>
+    
+    <!-- ===== PHOTO DETAIL MODAL ===== -->
+    <div id="photo-detail-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+         <div class="bg-white p-4 rounded-lg shadow-xl max-w-lg w-full relative">
+            <button id="photo-detail-close-btn" class="absolute -top-2 -right-2 bg-white rounded-full h-8 w-8 flex items-center justify-center text-xl font-bold text-gray-700 shadow-lg">&times;</button>
+            <img id="photo-detail-img" src="" class="w-full h-auto max-h-[60vh] object-contain rounded-md mb-4">
+            <h3 id="photo-detail-location" class="text-xl font-bold text-gray-800"></h3>
+            <p id="photo-detail-date" class="text-sm text-gray-500 mb-2"></p>
+            <p id="photo-detail-comment" class="text-gray-700 whitespace-pre-wrap"></p>
+         </div>
+    </div>
+
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Importy z Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // =================================================================================
+        // ZDE VLOŽTE KONFIGURACI VAŠEHO FIREBASE PROJEKTU
+        // =================================================================================
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Inicializace Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // Reference na DOM elementy
+        const homeView = document.getElementById('home-view');
+        const uploadView = document.getElementById('upload-view');
+        const galleryView = document.getElementById('gallery-view');
+        
+        const goToUploadBtn = document.getElementById('go-to-upload-btn');
+        const goToGalleryBtn = document.getElementById('go-to-gallery-btn');
+        const backToHomeFromUpload = document.getElementById('back-to-home-from-upload');
+        const backToHomeFromGallery = document.getElementById('back-to-home-from-gallery');
+
+        const uploadForm = document.getElementById('upload-form');
+        const locationSelect = document.getElementById('location');
+        const photoInput = document.getElementById('photo');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const commentTextarea = document.getElementById('comment');
+        const generateCommentBtn = document.getElementById('generate-comment-btn');
+        const commentSpinner = document.getElementById('comment-spinner');
+
+        const galleryGrid = document.getElementById('gallery-grid');
+        const noPhotosMessage = document.getElementById('no-photos-message');
+        
+        const loadingOverlay = document.getElementById('loading-overlay');
+        
+        const messageModal = document.getElementById('message-modal');
+        const messageTitle = document.getElementById('message-title');
+        const messageText = document.getElementById('message-text');
+        const messageCloseBtn = document.getElementById('message-close-btn');
+
+        const photoDetailModal = document.getElementById('photo-detail-modal');
+        const photoDetailCloseBtn = document.getElementById('photo-detail-close-btn');
+        const photoDetailImg = document.getElementById('photo-detail-img');
+        const photoDetailLocation = document.getElementById('photo-detail-location');
+        const photoDetailDate = document.getElementById('photo-detail-date');
+        const photoDetailComment = document.getElementById('photo-detail-comment');
+
+
+        let currentUser = null;
+
+        // =================================================================================
+        // NAVIGACE V APLIKACI
+        // =================================================================================
+        
+        function showView(view) {
+            homeView.style.display = 'none';
+            uploadView.style.display = 'none';
+            galleryView.style.display = 'none';
+            view.style.display = 'block';
+        }
+
+        goToUploadBtn.addEventListener('click', () => showView(uploadView));
+        goToGalleryBtn.addEventListener('click', () => {
+            showView(galleryView);
+            loadGallery();
+        });
+        backToHomeFromUpload.addEventListener('click', () => showView(homeView));
+        backToHomeFromGallery.addEventListener('click', () => showView(homeView));
+
+        // =================================================================================
+        // ZOBRAZENÍ ZPRÁVY A MODÁLNÍCH OKEN
+        // =================================================================================
+
+        function showMessage(title, text) {
+            messageTitle.textContent = title;
+            messageText.textContent = text;
+            messageModal.style.display = 'flex';
+        }
+
+        messageCloseBtn.addEventListener('click', () => {
+            messageModal.style.display = 'none';
+        });
+
+        photoDetailCloseBtn.addEventListener('click', () => {
+            photoDetailModal.style.display = 'none';
+        });
+
+        // =================================================================================
+        // AUTENTIZACE UŽIVATELE
+        // =================================================================================
+        
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+            } else {
+                signInAnonymously(auth).catch((error) => {
+                    console.error("Anonymous sign-in failed:", error);
+                    showMessage("Chyba", "Nepodařilo se připojit k serveru. Zkuste to prosím znovu.");
+                });
+            }
+        });
+
+        // =================================================================================
+        // ZPRACOVÁNÍ URL PARAMETRU PRO LOKALITU
+        // =================================================================================
+        
+        function preselectLocationFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const location = urlParams.get('location');
+            if (location) {
+                const formattedLocation = location.charAt(0).toUpperCase() + location.slice(1).toLowerCase();
+                if (locationSelect.querySelector(`option[value="${formattedLocation}"]`)) {
+                    locationSelect.value = formattedLocation;
+                    showView(uploadView);
+                }
+            }
+        }
+        
+        // =================================================================================
+        // NAHRÁVÁNÍ FOTKY
+        // =================================================================================
+
+        photoInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreviewContainer.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                 imagePreviewContainer.style.display = 'none';
+            }
+        });
+        
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!currentUser) {
+                showMessage("Chyba", "Nejste přihlášeni. Zkuste prosím obnovit stránku.");
+                return;
+            }
+
+            const location = uploadForm.location.value;
+            const comment = uploadForm.comment.value;
+            const photoFile = uploadForm.photo.files[0];
+
+            if (!location || !photoFile) {
+                showMessage("Chybějící údaje", "Prosím, vyberte lokalitu a fotografii.");
+                return;
+            }
+
+            loadingOverlay.style.display = 'flex';
+
+            try {
+                const filePath = `photos/${Date.now()}_${photoFile.name}`;
+                const storageRef = ref(storage, filePath);
+                const snapshot = await uploadBytes(storageRef, photoFile);
+                const photoURL = await getDownloadURL(snapshot.ref);
+
+                await addDoc(collection(db, "photos"), {
+                    location: location,
+                    comment: comment,
+                    imageUrl: photoURL,
+                    createdAt: serverTimestamp(),
+                    uploaderUid: currentUser.uid
+                });
+                
+                loadingOverlay.style.display = 'none';
+                showMessage("Úspěch!", "Vaše fotografie byla úspěšně nahrána.");
+                
+                uploadForm.reset();
+                imagePreviewContainer.style.display = 'none';
+                showView(homeView);
+
+            } catch (error) {
+                console.error("Upload error:", error);
+                loadingOverlay.style.display = 'none';
+                showMessage("Chyba nahrávání", "Během nahrávání došlo k chybě. Zkuste to prosím znovu.");
+            }
+        });
+
+        // =================================================================================
+        // ✨ GEMINI API - GENERÁTOR KOMENTÁŘŮ
+        // =================================================================================
+        
+        // Funkce pro převod souboru na base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]); // Získáme jen base64 data
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        generateCommentBtn.addEventListener('click', async () => {
+            const photoFile = photoInput.files[0];
+            const location = locationSelect.value;
+            
+            if (!photoFile) {
+                showMessage("Chybí fotka", "Nejdříve prosím vyberte fotografii.");
+                return;
+            }
+            if (!location) {
+                showMessage("Chybí lokalita", "Prosím, vyberte lokalitu, aby byl komentář přesnější.");
+                return;
+            }
+
+            commentSpinner.style.display = 'block';
+            generateCommentBtn.disabled = true;
+
+            try {
+                const base64ImageData = await fileToBase64(photoFile);
+                
+                const prompt = `Jsi asistent pro aplikaci 'Young Haleny Explorer'. Tvým úkolem je popsat fotografii z obce Halenkovice. Fotografie byla pořízena na místě zvaném '${location}'. Popiš scénu kreativně a poeticky. Zaměř se na atmosféru, světlo a detaily. Buď stručný, maximálně 3-4 věty. Odpověz v češtině.`;
+                
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            { inlineData: { mimeType: photoFile.type, data: base64ImageData } }
+                        ]
+                    }]
+                };
+
+                const apiKey = ""; // API klíč není potřeba, Canvas ho doplní automaticky
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    commentTextarea.value = text.trim();
+                } else {
+                    throw new Error("No content generated.");
+                }
+
+            } catch (error) {
+                console.error("Gemini API error:", error);
+                showMessage("Chyba AI", "Nepodařilo se vygenerovat komentář. Zkuste to prosím znovu.");
+            } finally {
+                commentSpinner.style.display = 'none';
+                generateCommentBtn.disabled = false;
+            }
+        });
+
+
+        // =================================================================================
+        // NAČTENÍ A ZOBRAZENÍ GALERIE
+        // =================================================================================
+
+        async function loadGallery() {
+            galleryGrid.innerHTML = ''; 
+            noPhotosMessage.style.display = 'none';
+            
+            try {
+                const q = query(collection(db, "photos")); 
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    noPhotosMessage.style.display = 'block';
+                    return;
+                }
+
+                const photos = [];
+                querySnapshot.forEach(doc => {
+                    photos.push({ id: doc.id, ...doc.data() });
+                });
+
+                photos.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+                photos.forEach(photoData => {
+                    const photoEl = document.createElement('div');
+                    photoEl.className = 'relative group rounded-lg overflow-hidden shadow-md cursor-pointer';
+                    
+                    const date = photoData.createdAt ? new Date(photoData.createdAt.seconds * 1000).toLocaleDateString('cs-CZ') : 'Neznámé datum';
+
+                    photoEl.innerHTML = `
+                        <img src="${photoData.imageUrl}" alt="Fotografie z ${photoData.location}" class="w-full h-48 object-cover group-hover:opacity-75 transition-opacity">
+                        <div class="absolute inset-0 bg-black bg-opacity-20 group-hover:bg-opacity-40 transition-all"></div>
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-white">
+                            <p class="font-bold text-sm">${photoData.location}</p>
+                            <p class="text-xs">${date}</p>
+                        </div>
+                    `;
+                    
+                    photoEl.addEventListener('click', () => {
+                        photoDetailImg.src = photoData.imageUrl;
+                        photoDetailLocation.textContent = photoData.location;
+                        photoDetailDate.textContent = date;
+                        photoDetailComment.textContent = photoData.comment || 'Bez komentáře.';
+                        photoDetailModal.style.display = 'flex';
+                    });
+
+                    galleryGrid.appendChild(photoEl);
+                });
+
+            } catch (error) {
+                console.error("Error loading gallery:", error);
+                showMessage("Chyba galerie", "Nepodařilo se načíst fotografie.");
+                noPhotosMessage.style.display = 'block';
+            }
+        }
+
+        // =================================================================================
+        // INICIALIZACE APLIKACE
+        // =================================================================================
+        
+        document.addEventListener('DOMContentLoaded', preselectLocationFromURL);
+
+    </script>
+</body>
+</html>
